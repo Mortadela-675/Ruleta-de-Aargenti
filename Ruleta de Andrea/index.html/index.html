@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Juego de la comida argentina</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: sans-serif;
+      background: #f0f6ff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .wheel-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem;
+      gap: 1.5rem;
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(46, 74, 142, 0.12);
+      max-width: 440px;
+      width: 100%;
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 600;
+      color: #2E4A8E;
+      text-align: center;
+    }
+
+    .canvas-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #pointer {
+      position: absolute;
+      top: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 14px solid transparent;
+      border-right: 14px solid transparent;
+      border-top: 30px solid #2E4A8E;
+      z-index: 10;
+    }
+
+    #spinBtn {
+      padding: 12px 36px;
+      font-size: 16px;
+      font-weight: 600;
+      border-radius: 12px;
+      border: 2px solid #4A90D9;
+      background: #4A90D9;
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    #spinBtn:hover { background: #2E6DB5; border-color: #2E6DB5; }
+    #spinBtn:active { transform: scale(0.97); }
+    #spinBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .result-label {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 4px;
+      text-align: center;
+    }
+
+    #result-box {
+      min-height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      font-weight: 600;
+      color: #2E4A8E;
+      border-radius: 12px;
+      padding: 12px 28px;
+      border: 2px solid #4A90D9;
+      background: #EAF4FF;
+      text-align: center;
+      min-width: 240px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="wheel-container">
+  <h1>Juego de la comida argentina</h1>
+
+  <div class="canvas-wrap">
+    <div id="pointer"></div>
+    <canvas id="wheel" width="360" height="360"></canvas>
+  </div>
+
+  <button id="spinBtn">¡Girar!</button>
+
+  <div>
+    <div class="result-label">Resultado</div>
+    <div id="result-box">—</div>
+  </div>
+</div>
+
+<script>
+  const items = [
+    "Asado",
+    "Empanadas",
+    "Milanesa",
+    "Locro",
+    "Choripán",
+    "Alfajor",
+    "Humita",
+    "Medialunas",
+    "Nada"
+  ];
+
+  // Colores celeste y blanco de la bandera argentina
+  const colors = [
+    "#74B9E8",
+    "#FFFFFF",
+    "#4A90D9",
+    "#FFFFFF",
+    "#74B9E8",
+    "#FFFFFF",
+    "#4A90D9",
+    "#FFFFFF",
+    "#2E6DB5"
+  ];
+
+  const textColors = [
+    "#1A3A6B",
+    "#2E6DB5",
+    "#FFFFFF",
+    "#2E6DB5",
+    "#1A3A6B",
+    "#2E6DB5",
+    "#FFFFFF",
+    "#2E6DB5",
+    "#FFFFFF"
+  ];
+
+  const canvas = document.getElementById("wheel");
+  const ctx = canvas.getContext("2d");
+  const numItems = items.length;
+  const arc = (2 * Math.PI) / numItems;
+  let currentAngle = 0;
+  let spinning = false;
+
+  function drawSun(cx, cy, r) {
+    const rays = 16;
+    ctx.save();
+    ctx.fillStyle = "#F5C518";
+    ctx.strokeStyle = "#D4A017";
+    ctx.lineWidth = 1;
+    for (let i = 0; i < rays; i++) {
+      const a = (i / rays) * 2 * Math.PI;
+      const isLong = i % 2 === 0;
+      ctx.beginPath();
+      if (isLong) {
+        ctx.moveTo(cx + Math.cos(a) * (r + 2), cy + Math.sin(a) * (r + 2));
+        ctx.lineTo(cx + Math.cos(a + 0.2) * r, cy + Math.sin(a + 0.2) * r);
+        ctx.lineTo(cx + Math.cos(a - 0.2) * r, cy + Math.sin(a - 0.2) * r);
+      } else {
+        ctx.moveTo(cx + Math.cos(a) * (r - 2), cy + Math.sin(a) * (r - 2));
+        ctx.lineTo(cx + Math.cos(a + 0.15) * (r - 5), cy + Math.sin(a + 0.15) * (r - 5));
+        ctx.lineTo(cx + Math.cos(a - 0.15) * (r - 5), cy + Math.sin(a - 0.15) * (r - 5));
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.beginPath();
+    ctx.arc(cx, cy, r - 4, 0, 2 * Math.PI);
+    ctx.fillStyle = "#F5C518";
+    ctx.fill();
+    ctx.strokeStyle = "#D4A017";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawWheel(angle) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const r = 170;
+
+    for (let i = 0; i < numItems; i++) {
+      const start = angle + i * arc;
+      const end = start + arc;
+
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, r, start, end);
+      ctx.closePath();
+      ctx.fillStyle = colors[i];
+      ctx.fill();
+      ctx.strokeStyle = "#4A90D9";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(start + arc / 2);
+      ctx.textAlign = "right";
+      ctx.fillStyle = textColors[i];
+      ctx.font = "bold 13px sans-serif";
+      ctx.fillText(items[i], r - 10, 5);
+      ctx.restore();
+    }
+
+    // Borde exterior
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+    ctx.strokeStyle = "#2E4A8E";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // Sol de Mayo en el centro
+    drawSun(cx, cy, 18);
+  }
+
+  drawWheel(currentAngle);
+
+  document.getElementById("spinBtn").addEventListener("click", function () {
+    if (spinning) return;
+    spinning = true;
+    this.disabled = true;
+    document.getElementById("result-box").textContent = "—";
+
+    const extraSpins = (5 + Math.floor(Math.random() * 5)) * 2 * Math.PI;
+    const randomSlice = Math.floor(Math.random() * numItems);
+    const targetAngle = currentAngle + extraSpins + (randomSlice * arc) + (arc / 2);
+
+    const duration = 3500;
+    const start = performance.now();
+    const startAngle = currentAngle;
+
+    function easeOut(t) { return 1 - Math.pow(1 - t, 4); }
+
+    function animate(now) {
+      const elapsed = now - start;
+      const t = Math.min(elapsed / duration, 1);
+      currentAngle = startAngle + (targetAngle - startAngle) * easeOut(t);
+      drawWheel(currentAngle);
+
+      if (t < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        currentAngle = currentAngle % (2 * Math.PI);
+        spinning = false;
+        document.getElementById("spinBtn").disabled = false;
+
+        const pointerAngle = (3 * Math.PI / 2);
+        const normalized = ((pointerAngle - currentAngle) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+        const index = Math.floor(normalized / arc) % numItems;
+        const winner = items[index];
+        const box = document.getElementById("result-box");
+        box.textContent = winner === "Nada" ? "😔 Nada esta vez" : "🍽 " + winner;
+      }
+    }
+
+    requestAnimationFrame(animate);
+  });
+</script>
+
+</body>
+</html>
